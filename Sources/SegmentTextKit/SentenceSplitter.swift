@@ -2,9 +2,9 @@
 //  SentenceSplitter.swift
 //
 
-import Foundation
-import CoreML
 import Accelerate
+import CoreML
+import Foundation
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
 public class SentenceSplitter {
@@ -32,31 +32,31 @@ public class SentenceSplitter {
     /// Initialize with model and tokenizer paths
     public init(modelPath: URL? = nil, tokenizerPath: URL? = nil, bundle: Bundle) throws {
         // Load CoreML model
-        let modelURL = modelPath ?? bundle.url(
+        let modelURL = bundle.url(
             forResource: "SaT",
             withExtension: "mlmodelc",
             subdirectory: "Resources"
         )!
 
-        // Configure model for performance
         let config = MLModelConfiguration()
-        // Use CPU and GPU for better performance on iOS
         config.computeUnits = .cpuAndGPU
-        // Allow low precision computation for faster inference
         config.allowLowPrecisionAccumulationOnGPU = true
         self.model = try SaT(contentsOf: modelURL, configuration: config)
 
         // Load tokenizer
-        let tokenizerURL = tokenizerPath ?? bundle.url(
-            forResource: "sentencepiece.bpe",
-            withExtension: "model",
-            subdirectory: "Resources"
-        )!
+        let tokenizerURL =
+            tokenizerPath ?? bundle.url(
+                forResource: "sentencepiece.bpe",
+                withExtension: "model",
+                subdirectory: "Resources"
+            )!
         self.tokenizer = try SentencePieceTokenizer(modelPath: tokenizerURL.path)
 
         // Pre-allocate arrays
-        self.inputIdsArray = try MLMultiArray(shape: [1, NSNumber(value: maxLength)], dataType: .int32)
-        self.attentionMaskArray = try MLMultiArray(shape: [1, NSNumber(value: maxLength)], dataType: .int32)
+        self.inputIdsArray = try MLMultiArray(
+            shape: [1, NSNumber(value: maxLength)], dataType: .int32)
+        self.attentionMaskArray = try MLMultiArray(
+            shape: [1, NSNumber(value: maxLength)], dataType: .int32)
     }
 
     /// Initialize with just bundle
@@ -92,7 +92,7 @@ public class SentenceSplitter {
 
     private func findThresholdIndices(probs: [Float], threshold: Float) -> [Int] {
         var indices: [Int] = []
-        indices.reserveCapacity(probs.count / 10) // Estimate ~10% will exceed threshold
+        indices.reserveCapacity(probs.count / 10)  // Estimate ~10% will exceed threshold
 
         for (index, prob) in probs.enumerated() {
             if prob > threshold {
@@ -120,7 +120,8 @@ public class SentenceSplitter {
     private func processSingleBlock(text: String) throws -> [Float] {
         // Check cache first
         if let cached = tokenCache[text] {
-            return try processTokenizedText(text: text, tokens: cached.tokens, offsets: cached.offsets)
+            return try processTokenizedText(
+                text: text, tokens: cached.tokens, offsets: cached.offsets)
         }
 
         // Tokenize and cache
@@ -136,66 +137,73 @@ public class SentenceSplitter {
     }
 
     /// Process already tokenized text
-     private func processTokenizedText(text: String, tokens: [Int], offsets: [(Int, Int)]) throws -> [Float] {
-         // Prepare input efficiently
-         let (inputIds, attentionMask) = tokenizer.encodeForModel(
-             text: text,
-             maxLength: maxLength,
-             addSpecialTokens: true,
-             clsTokenId: clsTokenId,
-             sepTokenId: sepTokenId,
-             padTokenId: padTokenId
-         )
+    private func processTokenizedText(text: String, tokens: [Int], offsets: [(Int, Int)]) throws
+        -> [Float]
+    {
+        // Prepare input efficiently
+        let (inputIds, attentionMask) = tokenizer.encodeForModel(
+            text: text,
+            maxLength: maxLength,
+            addSpecialTokens: true,
+            clsTokenId: clsTokenId,
+            sepTokenId: sepTokenId,
+            padTokenId: padTokenId
+        )
 
-         // Use cached MLMultiArrays - use memcpy for better performance
-         inputIds.withUnsafeBufferPointer { idsBuffer in
-             attentionMask.withUnsafeBufferPointer { maskBuffer in
-                 // Get raw pointers for direct memory access
-                 let inputPtr = inputIdsArray.dataPointer.bindMemory(to: Int32.self, capacity: maxLength)
-                 let maskPtr = attentionMaskArray.dataPointer.bindMemory(to: Int32.self, capacity: maxLength)
+        // Use cached MLMultiArrays - use memcpy for better performance
+        inputIds.withUnsafeBufferPointer { idsBuffer in
+            attentionMask.withUnsafeBufferPointer { maskBuffer in
+                // Get raw pointers for direct memory access
+                let inputPtr = inputIdsArray.dataPointer.bindMemory(
+                    to: Int32.self, capacity: maxLength)
+                let maskPtr = attentionMaskArray.dataPointer.bindMemory(
+                    to: Int32.self, capacity: maxLength)
 
-                 // Copy data directly
-                 memcpy(inputPtr, idsBuffer.baseAddress, maxLength * MemoryLayout<Int32>.size)
-                 memcpy(maskPtr, maskBuffer.baseAddress, maxLength * MemoryLayout<Int32>.size)
-             }
-         }
+                // Copy data directly
+                memcpy(inputPtr, idsBuffer.baseAddress, maxLength * MemoryLayout<Int32>.size)
+                memcpy(maskPtr, maskBuffer.baseAddress, maxLength * MemoryLayout<Int32>.size)
+            }
+        }
 
-         // Run model prediction
-         let output = try model.prediction(input_ids: inputIdsArray, attention_mask: attentionMaskArray)
+        // Run model prediction
+        let output = try model.prediction(
+            input_ids: inputIdsArray, attention_mask: attentionMaskArray)
+        let logits = output.output
 
-         // Extract logits efficiently
-         let logits = output.output
-         let sequenceLength = tokens.count + 2 // +2 for CLS and SEP tokens
+        let sequenceLength = tokens.count + 2  // +2 for CLS and SEP tokens
 
-         // Use pre-allocated buffer for probabilities
-         var probabilities = [Float](repeating: 0, count: sequenceLength)
+        // Use pre-allocated buffer for probabilities
+        var probabilities = [Float](repeating: 0, count: sequenceLength)
 
-         // Apply sigmoid using Accelerate
-         probabilities.withUnsafeMutableBufferPointer { buffer in
-             for i in 0..<sequenceLength {
-                 buffer[i] = logits[i].floatValue
-             }
+        // Apply sigmoid using Accelerate
+        probabilities.withUnsafeMutableBufferPointer { buffer in
+            for i in 0 ..< sequenceLength {
+                buffer[i] = logits[i].floatValue
+            }
 
-             // Apply sigmoid using vForce
-             var negOne: Float = -1.0
-             vDSP_vsmul(buffer.baseAddress!, 1, &negOne, buffer.baseAddress!, 1, vDSP_Length(sequenceLength))
+            // Apply sigmoid using vForce
+            var negOne: Float = -1.0
+            vDSP_vsmul(
+                buffer.baseAddress!, 1, &negOne, buffer.baseAddress!, 1, vDSP_Length(sequenceLength)
+            )
 
-             var count = Int32(sequenceLength)
-             vvexpf(buffer.baseAddress!, buffer.baseAddress!, &count)
+            var count = Int32(sequenceLength)
+            vvexpf(buffer.baseAddress!, buffer.baseAddress!, &count)
 
-             var one: Float = 1.0
-             vDSP_vsadd(buffer.baseAddress!, 1, &one, buffer.baseAddress!, 1, vDSP_Length(sequenceLength))
-             vvrecf(buffer.baseAddress!, buffer.baseAddress!, &count)
-         }
+            var one: Float = 1.0
+            vDSP_vsadd(
+                buffer.baseAddress!, 1, &one, buffer.baseAddress!, 1, vDSP_Length(sequenceLength))
+            vvrecf(buffer.baseAddress!, buffer.baseAddress!, &count)
+        }
 
-         // Map token probabilities to character positions
-         return mapTokenProbsToCharProbs(
-             text: text,
-             tokenProbs: probabilities,
-             offsetMapping: offsets,
-             excludeSpecialTokens: true
-         )
-     }
+        // Map token probabilities to character positions
+        return mapTokenProbsToCharProbs(
+            text: text,
+            tokenProbs: probabilities,
+            offsetMapping: offsets,
+            excludeSpecialTokens: true
+        )
+    }
 
     private func mapTokenProbsToCharProbs(
         text: String,
@@ -208,7 +216,7 @@ public class SentenceSplitter {
         let startIdx = excludeSpecialTokens ? 1 : 0
         let endIdx = min(tokenProbs.count - (excludeSpecialTokens ? 1 : 0), offsetMapping.count + 1)
 
-        for i in startIdx..<endIdx {
+        for i in startIdx ..< endIdx {
             let tokenIdx = i - (excludeSpecialTokens ? 1 : 0)
             if tokenIdx < offsetMapping.count {
                 let end = offsetMapping[tokenIdx].1
@@ -219,7 +227,7 @@ public class SentenceSplitter {
         }
 
         return charProbs
-     }
+    }
 
     /// Process with sliding window
     private func processWithStride(text: String) throws -> [Float] {
@@ -243,7 +251,7 @@ public class SentenceSplitter {
             let endIndex = min(offset + blockSize, text.count)
             let startIdx = text.index(text.startIndex, offsetBy: offset)
             let endIdx = text.index(text.startIndex, offsetBy: endIndex)
-            let block = String(text[startIdx..<endIdx])
+            let block = String(text[startIdx ..< endIdx])
             blocks.append((block, offset))
 
             let nextOffset = offset + stride
@@ -271,7 +279,7 @@ public class SentenceSplitter {
         }
 
         // Average overlapping predictions
-        for i in 0..<allProbs.count {
+        for i in 0 ..< allProbs.count {
             if counts[i] > 0 {
                 allProbs[i] /= Float(counts[i])
             }
@@ -300,7 +308,7 @@ public class SentenceSplitter {
                 endIdx += 1
             }
 
-            let sentence = String(textArray[offset..<endIdx])
+            let sentence = String(textArray[offset ..< endIdx])
             if stripWhitespace {
                 let trimmed = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {

@@ -40,4 +40,3 @@ sh ./build_framework.sh
 4. **Verify integration**:
 - In your project navigator, you should see the package under "Package Dependencies"
 - The package icon should show without any errors
-

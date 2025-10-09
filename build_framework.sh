@@ -39,7 +39,7 @@ cp Sources/SentencePieceWrapper/include/SentencePieceWrapper.h "$OUTPUT_DIR/Sour
 cp -r Frameworks/SentencePiece.xcframework "$OUTPUT_DIR/"
 
 # Create Package.swift
-cat > "$OUTPUT_DIR/Package.swift" <<'EOF'
+cat >"$OUTPUT_DIR/Package.swift" <<'EOF'
 // swift-tools-version: 5.9
 import PackageDescription
 
@@ -88,7 +88,7 @@ let package = Package(
 EOF
 
 # Create README
-cat > "$OUTPUT_DIR/README.md" <<'EOF'
+cat >"$OUTPUT_DIR/README.md" <<'EOF'
 # SegmentTextKit
 
 A Swift framework for sentence segmentation and tokenization using CoreML and SentencePiece.
@@ -150,7 +150,7 @@ EOF
 
 # Create a simple example
 mkdir -p "$OUTPUT_DIR/Examples"
-cat > "$OUTPUT_DIR/Examples/Example.swift" <<'EOF'
+cat >"$OUTPUT_DIR/Examples/Example.swift" <<'EOF'
 import SegmentTextKit
 
 // Example usage
@@ -158,30 +158,30 @@ import SegmentTextKit
 func demonstrateSegmentTextKit() async throws {
     // Initialize the framework
     let segmenter = try SegmentTextKit()
-    
+
     // Example text
     let text = """
     Hello world. How are you doing today? I hope you're having a great day!
     This is another paragraph. It contains multiple sentences.
     """
-    
+
     // Split into sentences
     let sentences = segmenter.splitSentences(text)
     print("Sentences:")
     for (i, sentence) in sentences.enumerated() {
         print("  \(i + 1): \(sentence)")
     }
-    
+
     // Tokenize a sentence
     let firstSentence = sentences.first ?? ""
     let tokens = segmenter.encode(firstSentence)
     print("\nTokens for '\(firstSentence)':")
     print("  IDs: \(tokens)")
-    
+
     // Get token pieces
     let pieces = segmenter.tokenize(firstSentence)
     print("  Pieces: \(pieces)")
-    
+
     // Tokenize with offsets
     let (tokenIds, offsets) = segmenter.encodeWithOffsets(firstSentence)
     print("\nToken offsets:")

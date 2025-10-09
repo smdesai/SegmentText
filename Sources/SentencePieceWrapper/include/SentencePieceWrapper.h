@@ -18,7 +18,7 @@ SentencePieceProcessor sentencepiece_create(const char* model_path);
 
 // Encode text to pieces (tokens)
 // Returns number of pieces, fills pieces array with token strings
-int sentencepiece_encode_as_pieces(SentencePieceProcessor processor, 
+int sentencepiece_encode_as_pieces(SentencePieceProcessor processor,
                                   const char* text,
                                   char*** pieces);
 

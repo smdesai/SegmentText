@@ -2,8 +2,8 @@
 //  SegmentTextKit.swift
 //
 
-import Foundation
 import CoreML
+import Foundation
 
 /// Main class for sentence segmentation and tokenization
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
@@ -15,7 +15,10 @@ public class SegmentTextKit {
     public init() throws {
         let bundle = Bundle.module
 
-        guard let tokenizerURL = bundle.url(forResource: "sentencepiece.bpe", withExtension: "model", subdirectory: "Resources") else {
+        guard
+            let tokenizerURL = bundle.url(
+                forResource: "sentencepiece.bpe", withExtension: "model", subdirectory: "Resources")
+        else {
             throw SegmentTextError.modelNotFound("sentencepiece.bpe.model")
         }
 
@@ -26,12 +29,17 @@ public class SegmentTextKit {
     /// Initialize with custom model paths
     public init(sentenceModelPath: URL? = nil, tokenizerPath: URL? = nil) throws {
         let bundle = Bundle.module
-        self.sentenceSplitter = try SentenceSplitter(modelPath: sentenceModelPath, tokenizerPath: tokenizerPath, bundle: bundle)
+        self.sentenceSplitter = try SentenceSplitter(
+            modelPath: sentenceModelPath, tokenizerPath: tokenizerPath, bundle: bundle)
 
         if let tokenizerPath = tokenizerPath {
             self.tokenizer = try SentencePieceTokenizer(modelPath: tokenizerPath.path)
         } else {
-            guard let defaultTokenizerURL = bundle.url(forResource: "sentencepiece.bpe", withExtension: "model", subdirectory: "Resources") else {
+            guard
+                let defaultTokenizerURL = bundle.url(
+                    forResource: "sentencepiece.bpe", withExtension: "model",
+                    subdirectory: "Resources")
+            else {
                 throw SegmentTextError.modelNotFound("sentencepiece.bpe.model")
             }
             self.tokenizer = try SentencePieceTokenizer(modelPath: defaultTokenizerURL.path)

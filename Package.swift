@@ -7,7 +7,7 @@ let package = Package(
     name: "segmenttext",
     platforms: [
         .iOS(.v17),
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     products: [
         .library(
@@ -17,7 +17,7 @@ let package = Package(
         .executable(
             name: "segmenttext",
             targets: ["segmenttext"]
-        )
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
@@ -39,7 +39,7 @@ let package = Package(
             name: "SegmentTextKit",
             dependencies: [
                 .product(name: "Transformers", package: "swift-transformers"),
-                "SentencePieceWrapper"
+                "SentencePieceWrapper",
             ],
             resources: [
                 .copy("Resources")
@@ -48,15 +48,15 @@ let package = Package(
         .executableTarget(
             name: "segmenttext",
             dependencies: [
-               .product(name: "ArgumentParser", package: "swift-argument-parser"),
-               .product(name: "Transformers", package: "swift-transformers"),
-               "SentencePieceWrapper",
-               "SegmentTextKit"
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Transformers", package: "swift-transformers"),
+                "SentencePieceWrapper",
+                "SegmentTextKit",
             ],
             path: "Sources/SegmentTextCLI",
             resources: [
                 .copy("../SegmentTextKit/Resources")
             ]
-        )
+        ),
     ]
 )

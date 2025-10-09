@@ -21,23 +21,23 @@ SentencePieceProcessor sentencepiece_create(const char* model_path) {
     return processor;
 }
 
-int sentencepiece_encode_as_pieces(SentencePieceProcessor processor, 
+int sentencepiece_encode_as_pieces(SentencePieceProcessor processor,
                                   const char* text,
                                   char*** pieces) {
     if (!processor || !text || !pieces) return 0;
-    
+
     auto* sp = static_cast<sentencepiece::SentencePieceProcessor*>(processor);
     std::vector<std::string> pieces_vec;
-    
+
     const auto status = sp->Encode(text, &pieces_vec);
     if (!status.ok()) return 0;
-    
+
     // Allocate array of C strings
     *pieces = (char**)malloc(pieces_vec.size() * sizeof(char*));
     for (size_t i = 0; i < pieces_vec.size(); ++i) {
         (*pieces)[i] = strdup(pieces_vec[i].c_str());
     }
-    
+
     return (int) pieces_vec.size();
 }
 
@@ -45,17 +45,17 @@ int sentencepiece_encode_as_ids(SentencePieceProcessor processor,
                                const char* text,
                                int** ids) {
     if (!processor || !text || !ids) return 0;
-    
+
     auto* sp = static_cast<sentencepiece::SentencePieceProcessor*>(processor);
     std::vector<int> ids_vec;
-    
+
     const auto status = sp->Encode(text, &ids_vec);
     if (!status.ok()) return 0;
-    
+
     // Allocate array of ints
     *ids = (int*)malloc(ids_vec.size() * sizeof(int));
     memcpy(*ids, ids_vec.data(), ids_vec.size() * sizeof(int));
-    
+
     return (int) ids_vec.size();
 }
 

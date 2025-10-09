@@ -1,2 +1,2 @@
 ## Instructions
-- Copy SentencePiece.xcframework here 
+- Copy SentencePiece.xcframework here
