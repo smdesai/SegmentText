@@ -64,8 +64,8 @@ public class SentenceSplitter {
         try self.init(modelPath: nil, tokenizerPath: nil, bundle: bundle)
     }
 
-    /// Internal initializer using module bundle
-    internal convenience init() throws {
+    /// Initializer using module bundle
+    public convenience init() throws {
         try self.init(modelPath: nil, tokenizerPath: nil, bundle: Bundle.module)
     }
 

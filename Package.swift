@@ -21,7 +21,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(url: "https://github.com/huggingface/swift-transformers", from: "0.1.22"),
+        .package(
+            url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.0.0")),
     ],
     targets: [
         .binaryTarget(
