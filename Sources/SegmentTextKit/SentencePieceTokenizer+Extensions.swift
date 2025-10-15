@@ -13,42 +13,105 @@ extension SentencePieceTokenizer {
     public func encodeWithOffset(text: String) -> (
         encodedTokens: [Int], offsetMapping: [(Int, Int)]
     ) {
-        // Get encoded tokens
+        guard !text.isEmpty else { return ([], []) }
+
         let encodedTokens = self.encode(text: text)
+        guard !encodedTokens.isEmpty else { return ([], []) }
 
-        // Get token pieces
-        let tokenPieces = self.tokenize(text: text)
-
-        // Calculate offset mapping using a more efficient approach
         var offsetMapping: [(Int, Int)] = []
-        offsetMapping.reserveCapacity(tokenPieces.count)
+        offsetMapping.reserveCapacity(encodedTokens.count)
 
-        // Convert text to array for O(1) access
-        let textArray = Array(text)
-        var currentPosition = 0
+        var cursorIndex = text.startIndex
 
-        for piece in tokenPieces {
-            // Handle the special underscore character that represents spaces
-            let isSpacePrefix = piece.hasPrefix("▁")
-            let cleanPiece = isSpacePrefix ? String(piece.dropFirst()) : piece
-
-            if isSpacePrefix && currentPosition > 0 && currentPosition < textArray.count {
-                // Skip the space between words if not at the beginning
-                if textArray[currentPosition] == " " {
-                    currentPosition += 1
-                }
+        for tokenId in encodedTokens {
+            guard let piece = convertIdToToken(tokenId) else {
+                let position = text.distance(from: text.startIndex, to: cursorIndex)
+                offsetMapping.append((position, position))
+                continue
             }
 
-            // Calculate end position based on clean piece length
-            let start = currentPosition
-            let pieceLength = cleanPiece.count
-            let end = min(start + pieceLength, textArray.count)
+            var pieceText = piece
+            var searchStart = cursorIndex
 
+            if pieceText.hasPrefix("▁") {
+                pieceText.removeFirst()
+                while searchStart < text.endIndex, text[searchStart].isWhitespace {
+                    searchStart = text.index(after: searchStart)
+                }
+                cursorIndex = searchStart
+            }
+
+            if pieceText.isEmpty {
+                let position = text.distance(from: text.startIndex, to: cursorIndex)
+                offsetMapping.append((position, position))
+                continue
+            }
+
+            guard let matchRange = text[searchStart...].range(of: pieceText) else {
+                let position = text.distance(from: text.startIndex, to: cursorIndex)
+                offsetMapping.append((position, position))
+                continue
+            }
+
+            let start = text.distance(from: text.startIndex, to: matchRange.lowerBound)
+            let end = text.distance(from: text.startIndex, to: matchRange.upperBound)
             offsetMapping.append((start, end))
-            currentPosition = end
+            cursorIndex = matchRange.upperBound
         }
 
         return (encodedTokens: encodedTokens, offsetMapping: offsetMapping)
+    }
+
+    /// Encode text with padding and special tokens for model input
+    /// - Parameters:
+    ///   - tokens: Pre-tokenized ids (Python-compatible, already +1 adjusted)
+    ///   - maxLength: Maximum sequence length (default: 512)
+    ///   - addSpecialTokens: Whether to add CLS and SEP tokens (default: true)
+    ///   - clsTokenId: CLS token ID (default: 0 for Python compatibility)
+    ///   - sepTokenId: SEP token ID (default: 2 for Python compatibility)
+    ///   - padTokenId: PAD token ID (default: 1 for Python compatibility)
+    /// - Returns: A tuple containing input IDs, attention mask, and the number of non-special tokens used
+    public func encodeForModel(
+        tokens: [Int],
+        maxLength: Int = 512,
+        addSpecialTokens: Bool = true,
+        clsTokenId: Int32 = 0,
+        sepTokenId: Int32 = 2,
+        padTokenId: Int32 = 1
+    ) -> (inputIds: [Int32], attentionMask: [Int32], usedTokenCount: Int) {
+        guard maxLength > 0 else { return ([], [], 0) }
+
+        let specialTokenCount = addSpecialTokens ? 2 : 0
+        let capacityForTokens = max(0, maxLength - specialTokenCount)
+        let usedTokenCount = min(tokens.count, capacityForTokens)
+
+        var inputIds = [Int32](repeating: padTokenId, count: maxLength)
+        var attentionMask = [Int32](repeating: 0, count: maxLength)
+
+        var cursor = 0
+
+        if addSpecialTokens {
+            inputIds[cursor] = clsTokenId
+            attentionMask[cursor] = 1
+            cursor += 1
+        }
+
+        if usedTokenCount > 0 {
+            for token in tokens.prefix(usedTokenCount) {
+                guard cursor < maxLength else { break }
+                inputIds[cursor] = Int32(token)
+                attentionMask[cursor] = 1
+                cursor += 1
+            }
+        }
+
+        if addSpecialTokens && cursor < maxLength {
+            inputIds[cursor] = sepTokenId
+            attentionMask[cursor] = 1
+            cursor += 1
+        }
+
+        return (inputIds, attentionMask, usedTokenCount)
     }
 
     /// Encode text with padding and special tokens for model input
@@ -68,46 +131,15 @@ extension SentencePieceTokenizer {
         sepTokenId: Int32 = 2,
         padTokenId: Int32 = 1
     ) -> (inputIds: [Int32], attentionMask: [Int32]) {
-        // Tokenize the text
         let tokens = self.encode(text: text)
-
-        // Create input sequence
-        var inputSequence: [Int32] = []
-
-        if addSpecialTokens {
-            inputSequence.append(clsTokenId)
-        }
-
-        inputSequence.append(contentsOf: tokens.map { Int32($0) })
-
-        if addSpecialTokens {
-            inputSequence.append(sepTokenId)
-        }
-
-        // Calculate current length and padding needed
-        let currentLength = inputSequence.count
-        let paddingLength = maxLength - currentLength
-
-        if paddingLength > 0 {
-            // Pad if shorter than maxLength
-            inputSequence.append(contentsOf: Array(repeating: padTokenId, count: paddingLength))
-        } else if paddingLength < 0 {
-            // Truncate if longer than maxLength
-            if addSpecialTokens {
-                inputSequence = Array(inputSequence.prefix(maxLength - 1)) + [sepTokenId]
-            } else {
-                inputSequence = Array(inputSequence.prefix(maxLength))
-            }
-        }
-
-        // Create attention mask (1 for real tokens, 0 for padding)
-        let realTokenCount = min(currentLength, maxLength)
-        var attentionMask: [Int32] = Array(repeating: 1, count: realTokenCount)
-
-        if paddingLength > 0 {
-            attentionMask.append(contentsOf: Array(repeating: 0, count: paddingLength))
-        }
-
-        return (inputIds: inputSequence, attentionMask: attentionMask)
+        let (inputIds, attentionMask, _) = encodeForModel(
+            tokens: tokens,
+            maxLength: maxLength,
+            addSpecialTokens: addSpecialTokens,
+            clsTokenId: clsTokenId,
+            sepTokenId: sepTokenId,
+            padTokenId: padTokenId
+        )
+        return (inputIds, attentionMask)
     }
 }

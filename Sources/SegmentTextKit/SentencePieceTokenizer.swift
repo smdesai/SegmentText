@@ -10,7 +10,7 @@ import Tokenizers
 
 /// Swift wrapper for Google's SentencePiece tokenizer
 public class SentencePieceTokenizer: PreTrainedTokenizerModel {
-    private let processor: SentencePieceProcessor
+    fileprivate let processor: SentencePieceProcessor
     private let modelPath: String
 
     public let unknownTokenId: Int? = 0

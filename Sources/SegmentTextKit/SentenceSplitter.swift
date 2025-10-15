@@ -27,6 +27,7 @@ public class SentenceSplitter {
 
     // Cache for tokenization results
     private var tokenCache = [String: (tokens: [Int], offsets: [(Int, Int)])]()
+    private var tokenCacheOrder: [String] = []
     private let cacheSize = 100
 
     /// Initialize with model and tokenizer paths
@@ -120,6 +121,7 @@ public class SentenceSplitter {
     private func processSingleBlock(text: String) throws -> [Float] {
         // Check cache first
         if let cached = tokenCache[text] {
+            touchCacheEntry(for: text)
             return try processTokenizedText(
                 text: text, tokens: cached.tokens, offsets: cached.offsets)
         }
@@ -127,11 +129,7 @@ public class SentenceSplitter {
         // Tokenize and cache
         let (tokens, offsets) = tokenizer.encodeWithOffset(text: text)
 
-        // Update cache (with size limit)
-        if tokenCache.count >= cacheSize {
-            tokenCache.removeAll()
-        }
-        tokenCache[text] = (tokens, offsets)
+        cacheTokenization(tokens: tokens, offsets: offsets, for: text)
 
         return try processTokenizedText(text: text, tokens: tokens, offsets: offsets)
     }
@@ -141,14 +139,16 @@ public class SentenceSplitter {
         -> [Float]
     {
         // Prepare input efficiently
-        let (inputIds, attentionMask) = tokenizer.encodeForModel(
-            text: text,
+        let (inputIds, attentionMask, usedTokenCount) = tokenizer.encodeForModel(
+            tokens: tokens,
             maxLength: maxLength,
             addSpecialTokens: true,
             clsTokenId: clsTokenId,
             sepTokenId: sepTokenId,
             padTokenId: padTokenId
         )
+
+        let sequenceLength = usedTokenCount + 2  // +2 for CLS and SEP tokens
 
         // Use cached MLMultiArrays - use memcpy for better performance
         inputIds.withUnsafeBufferPointer { idsBuffer in
@@ -169,8 +169,6 @@ public class SentenceSplitter {
         let output = try model.prediction(
             input_ids: inputIdsArray, attention_mask: attentionMaskArray)
         let logits = output.output
-
-        let sequenceLength = tokens.count + 2  // +2 for CLS and SEP tokens
 
         // Use pre-allocated buffer for probabilities
         var probabilities = [Float](repeating: 0, count: sequenceLength)
@@ -197,10 +195,17 @@ public class SentenceSplitter {
         }
 
         // Map token probabilities to character positions
+        let offsetsToUse: [(Int, Int)]
+        if usedTokenCount < offsets.count {
+            offsetsToUse = Array(offsets.prefix(usedTokenCount))
+        } else {
+            offsetsToUse = offsets
+        }
+
         return mapTokenProbsToCharProbs(
             text: text,
             tokenProbs: probabilities,
-            offsetMapping: offsets,
+            offsetMapping: offsetsToUse,
             excludeSpecialTokens: true
         )
     }
@@ -235,46 +240,37 @@ public class SentenceSplitter {
         var counts = [Int](repeating: 0, count: text.count)
 
         let blockSize = maxLength - 2
-        var blocks: [(String, Int)] = []
-
-        // Pre-compute all blocks
+        let textCount = text.count
         var offset = 0
-        var processedOffsets = Set<Int>()
 
-        while offset < text.count {
-            // Avoid infinite loops
-            if processedOffsets.contains(offset) {
+        while offset < textCount {
+            let endOffset = min(offset + blockSize, textCount)
+            let startIdx = text.index(text.startIndex, offsetBy: offset)
+            let endIdx = text.index(text.startIndex, offsetBy: endOffset)
+            let block = String(text[startIdx ..< endIdx])
+
+            let blockProbs = try processSingleBlock(text: block)
+            let limit = min(blockProbs.count, textCount - offset)
+
+            for i in 0 ..< limit {
+                let globalIdx = offset + i
+                allProbs[globalIdx] += blockProbs[i]
+                counts[globalIdx] += 1
+            }
+
+            if endOffset == textCount {
                 break
             }
-            processedOffsets.insert(offset)
-
-            let endIndex = min(offset + blockSize, text.count)
-            let startIdx = text.index(text.startIndex, offsetBy: offset)
-            let endIdx = text.index(text.startIndex, offsetBy: endIndex)
-            let block = String(text[startIdx ..< endIdx])
-            blocks.append((block, offset))
 
             let nextOffset = offset + stride
-
-            // Check if we need to process the last block
-            if nextOffset >= text.count && offset < text.count - blockSize {
-                offset = max(text.count - blockSize, 0)
+            if nextOffset >= textCount {
+                let tailOffset = max(textCount - blockSize, 0)
+                if tailOffset <= offset {
+                    break
+                }
+                offset = tailOffset
             } else {
                 offset = nextOffset
-            }
-        }
-
-        // Process blocks
-        for (block, blockOffset) in blocks {
-            let blockProbs = try processSingleBlock(text: block)
-
-            // Accumulate probabilities
-            for (i, prob) in blockProbs.enumerated() {
-                let globalIdx = blockOffset + i
-                if globalIdx < allProbs.count {
-                    allProbs[globalIdx] += prob
-                    counts[globalIdx] += 1
-                }
             }
         }
 
@@ -286,6 +282,38 @@ public class SentenceSplitter {
         }
 
         return allProbs
+    }
+
+    private func cacheTokenization(
+        tokens: [Int],
+        offsets: [(Int, Int)],
+        for key: String
+    ) {
+        tokenCache[key] = (tokens, offsets)
+        if let index = tokenCacheOrder.firstIndex(of: key) {
+            tokenCacheOrder.remove(at: index)
+        }
+        tokenCacheOrder.append(key)
+        trimTokenCacheIfNeeded()
+    }
+
+    private func touchCacheEntry(for key: String) {
+        if let index = tokenCacheOrder.firstIndex(of: key) {
+            tokenCacheOrder.remove(at: index)
+            tokenCacheOrder.append(key)
+        }
+    }
+
+    private func trimTokenCacheIfNeeded() {
+        guard tokenCacheOrder.count > cacheSize else { return }
+        let overflow = tokenCacheOrder.count - cacheSize
+        let batchSize = max(cacheSize / 5, 1)
+        let removalCount = max(overflow, batchSize)
+
+        for _ in 0 ..< min(removalCount, tokenCacheOrder.count) {
+            let key = tokenCacheOrder.removeFirst()
+            tokenCache.removeValue(forKey: key)
+        }
     }
 
     /// Sentence extraction
