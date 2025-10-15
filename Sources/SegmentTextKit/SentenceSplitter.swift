@@ -8,8 +8,9 @@ import Foundation
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
 public class SentenceSplitter {
-    private let model: SaT
+    private let model: MLModel
     private let tokenizer: SentencePieceTokenizer
+    private let predictionOptions = MLPredictionOptions()
 
     // Special token IDs (Python-compatible)
     private let clsTokenId: Int32 = 0
@@ -42,7 +43,7 @@ public class SentenceSplitter {
         let config = MLModelConfiguration()
         config.computeUnits = .cpuAndGPU
         config.allowLowPrecisionAccumulationOnGPU = true
-        self.model = try SaT(contentsOf: modelURL, configuration: config)
+        self.model = try MLModel(contentsOf: modelURL, configuration: config)
 
         // Load tokenizer
         let tokenizerURL =
@@ -166,9 +167,17 @@ public class SentenceSplitter {
         }
 
         // Run model prediction
-        let output = try model.prediction(
-            input_ids: inputIdsArray, attention_mask: attentionMaskArray)
-        let logits = output.output
+        let inputFeatures = try MLDictionaryFeatureProvider(dictionary: [
+            "input_ids": MLFeatureValue(multiArray: inputIdsArray),
+            "attention_mask": MLFeatureValue(multiArray: attentionMaskArray),
+        ])
+
+        let outputFeatures = try model.prediction(from: inputFeatures, options: predictionOptions)
+
+        guard let logits = outputFeatures.featureValue(for: "output")?.multiArrayValue else {
+            throw SegmentTextError.initializationFailed(
+                "SaT model output missing 'output' feature.")
+        }
 
         // Use pre-allocated buffer for probabilities
         var probabilities = [Float](repeating: 0, count: sequenceLength)
