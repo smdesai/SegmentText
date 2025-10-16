@@ -23,7 +23,7 @@ final public class StreamingSentenceSplitter {
     public init(splitter: SentenceSplitter, threshold: Float, stripWhitespace: Bool, delay: UInt64)
     {
         self.splitter = splitter
-        self.threshold = min(max(threshold, 0.1), 1.0)
+        self.threshold = min(max(threshold, 0.0), 1.0)
         self.stripWhitespace = stripWhitespace
         self.delay = delay
     }
@@ -54,12 +54,14 @@ final public class StreamingSentenceSplitter {
 
         var emitted: [String] = []
         var searchStart = snapshot.startIndex
+        var candidateEnd = searchStart
         var consumedEnd = snapshot.startIndex
 
         for sentence in sentences where !sentence.isEmpty {
+            let segmentStart = candidateEnd
             guard
-                let sentenceEnd = snapshot.index(
-                    searchStart,
+                let segmentEnd = snapshot.index(
+                    segmentStart,
                     offsetBy: sentence.count,
                     limitedBy: snapshot.endIndex
                 )
@@ -67,20 +69,23 @@ final public class StreamingSentenceSplitter {
                 break
             }
 
-            guard snapshot[searchStart ..< sentenceEnd] == sentence else { break }
+            guard snapshot[segmentStart ..< segmentEnd] == sentence else { break }
 
-            let nextChar = sentenceEnd < snapshot.endIndex ? snapshot[sentenceEnd] : nil
+            candidateEnd = segmentEnd
+
+            let candidateSlice = snapshot[searchStart ..< candidateEnd]
+            let nextChar = candidateEnd < snapshot.endIndex ? snapshot[candidateEnd] : nil
 
             guard
                 let termination = terminationIndex(
-                    for: sentence,
+                    for: candidateSlice,
                     in: snapshot,
                     sentenceStart: searchStart,
-                    sentenceEnd: sentenceEnd,
+                    sentenceEnd: candidateEnd,
                     nextChar: nextChar
                 )
             else {
-                break
+                continue
             }
 
             var sentenceSlice = snapshot[searchStart ..< termination]
@@ -93,6 +98,7 @@ final public class StreamingSentenceSplitter {
             }
             consumedEnd = termination
             searchStart = termination
+            candidateEnd = searchStart
         }
 
         guard !emitted.isEmpty else { return [] }
@@ -163,7 +169,7 @@ final public class StreamingSentenceSplitter {
         guard !tail.isEmpty else { return [] }
 
         if let termination = terminationIndex(
-            for: tail,
+            for: tail[...],
             in: tail,
             sentenceStart: tail.startIndex,
             sentenceEnd: tail.endIndex,
@@ -186,7 +192,7 @@ final public class StreamingSentenceSplitter {
     }
 
     private func terminationIndex(
-        for sentence: String,
+        for sentence: Substring,
         in snapshot: String,
         sentenceStart: String.Index,
         sentenceEnd: String.Index,
