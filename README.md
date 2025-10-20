@@ -3,9 +3,8 @@ This is a Swift command-line tool and a package for use in iOS/macOS for sentenc
 executable that wraps the SentencePiece C++ library through a custom Swift bridge.
 
 ## Prerequisites
-1. Follow the instrutions in Frameworks/README.md
-2. Follow the instructions in Sources/SegmentTextKit/Resources/README.md
-3. Once complete, the framework is ready to build
+1. Follow the environment and model creation steps in coreml-conversion/README.md
+2. Once complete, the framework is ready to build
 
 ## Build Commands
 ```bash
