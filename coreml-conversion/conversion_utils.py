@@ -40,32 +40,51 @@ def update_manifest_model_name(manifest_path: str, new_name: str) -> None:
         print("Warning: model.mlmodel not found. Only manifest was updated.")
 
 
-def palettize_model(mlpackage, *, bits: int = 8, mode: str = "kmeans"):
-    op_config = cto_coreml.OpPalettizerConfig(
-        nbits=bits,
-        mode=mode,
-    )
-    config = cto_coreml.OptimizationConfig(op_config)
-    return cto_coreml.palettize_weights(mlpackage, config)
+def palettize_model(mlpackage, *, bits: int = 8, weight_threshold: int = 512):
+    print(f"\nApplying {bits}-bit palettization...")
+    try:
+        op_config = cto_coreml.OpPalettizerConfig(
+            nbits=bits,
+            weight_threshold=weight_threshold,
+        )
+        config = cto_coreml.OptimizationConfig(op_config)
+        return cto_coreml.palettize_weights(mlpackage, config)
+    except Exception as e:
+        print(f"Error palettization failed: {e}")
+        return None
 
 
-def prune_model(mlpackage, *, threshold: float = 1e-12):
-    config = cto_coreml.OptimizationConfig(
-        global_config=cto_coreml.OpThresholdPrunerConfig(threshold=threshold)
-    )
-    return cto_coreml.prune_weights(mlpackage, config)
+def prune_model(mlpackage, *, threshold: float = 0.01):
+    print(f"\nApplying pruning quantization...")
+    try:
+        config = cto_coreml.OptimizationConfig(
+            global_config=cto_coreml.OpThresholdPrunerConfig(threshold=threshold)
+        )
+        return cto_coreml.prune_weights(mlpackage, config)
+    except Exception as e:
+        print(f"Error pruning failed: {e}")
+        return None
 
 
-def quantize_model(mlpackage, *, mode: str = "linear_symmetric"):
-    op_config = cto_coreml.OpLinearQuantizerConfig(
-        mode=mode,
-        dtype="int8",
-        granularity="per_block",
-        block_size=32,
-    )
+def quantize_model(mlpackage, *, dtype: str = "int8", mode: str = "linear_symmetric"):
+    if str == "linear":
+        print(f"\nApplying {dtype} quantization...")
+    else:
+        print("\nApplying mixed precision quantization...")
 
-    config = cto_coreml.OptimizationConfig(global_config=op_config)
-    return cto_coreml.linear_quantize_weights(mlpackage, config)
+    try:
+        op_config = cto_coreml.OpLinearQuantizerConfig(
+            mode=mode,
+            dtype=dtype,
+            granularity="per_block",
+            block_size=32,
+        )
+
+        config = cto_coreml.OptimizationConfig(global_config=op_config)
+        return cto_coreml.linear_quantize_weights(mlpackage, config)
+    except Exception as e:
+        print(f"INT8 quantization failed: {e}")
+        return None
 
 
 def apply_conversion(mlpackage, conversion_type: Conversion):
