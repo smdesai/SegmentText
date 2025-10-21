@@ -20,7 +20,7 @@ func runBenchmark(iterations: Int, optimizedOnly: Bool = true) async throws {
         "This is a short test. It has multiple sentences. Each one ends with punctuation!",
 
         // Medium text (~500 chars)
-        "Work order number is WO-47362. Nearest hospital is St. Mary's, about 3 miles east. Employee in charge is Tom Johnson. Cell coverage is good, that's a yes. Emergency actions were covered in the morning brief. AED is in truck number 4. Please ensure all safety protocols are followed. Contact dispatch if there are any issues. Remember to check equipment before departure. All personnel must wear appropriate PPE. Weather conditions are favorable today.",
+        "The sun rose slowly, painting the sky in soft gold and blush pink; birds chirped—brief, bright symphonies—as if greeting the day with quiet joy, while a lone cyclist pedaled down the empty street, wheels humming against pavement. Somewhere, a cat stretched in a sunbeam, unaware of the world’s rush; children laughed in the distance, their voices tumbling like wind chimes. The coffee shop opened its doors, releasing the rich aroma of roasted beans",
 
         // Long text (> 512 chars, requires sliding window)
         String(repeating: "This is a test sentence that will be repeated many times. ", count: 20)
