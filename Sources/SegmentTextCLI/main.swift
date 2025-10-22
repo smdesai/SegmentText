@@ -97,6 +97,7 @@ struct Split: AsyncParsableCommand {
                 delay: delay
             )
 
+            /*
             var currentIndex = text.startIndex
             while currentIndex < text.endIndex {
                 let chunkSize = Int.random(in: 5 ... 20)
@@ -107,6 +108,39 @@ struct Split: AsyncParsableCommand {
                 print("chunk: \(chunk)")
                 let s = runner.stream(text: chunk)
                 currentIndex = endIndex
+                if !s.isEmpty {
+                    print("sentences: \(s)")
+                }
+            
+                if delay > 0 {
+                    try? await Task.sleep(nanoseconds: delay * 1_000_000)
+                }
+            }
+            
+            let s = runner.finishStream()
+            if !s.isEmpty {
+                print("sentences: \(s)")
+            }
+            */
+
+            let chunks = [
+                "I went to see my ",
+                "univer",
+                "sity to ",
+                "see Prof. Jame",
+                "s and found he ",
+                "was not the",
+                "re and ins",
+                "tead had g",
+                "one to the hos",
+                "pital ",
+                "to see Dr. ",
+                "James about an ",
+                "ear infection.",
+            ]
+            for chunk in chunks {
+                print("chunk: \(chunk)")
+                let s = runner.stream(text: chunk)
                 if !s.isEmpty {
                     print("sentences: \(s)")
                 }
@@ -125,6 +159,7 @@ struct Split: AsyncParsableCommand {
             throw ExitCode.failure
         }
     }
+
 }
 
 struct VerifySplitter: AsyncParsableCommand {
