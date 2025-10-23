@@ -36,6 +36,40 @@ sh ./build_framework.sh
 - In the dialog that appears, ensure your app target is selected
 - Click **"Add Package"**
 
-4. **Verify integration**:
+ZG **Verify integration**:
 - In your project navigator, you should see the package under "Package Dependencies"
 - The package icon should show without any errors
+
+## Local CLI Usage
+1. Build the command-line tool in release mode:
+   ```bash
+   swift build -c release
+   ```
+2. Run the executable from the build directory. The available subcommands match those defined in `Sources/SegmentTextCLI/main.swift`:
+   - `tokenize <text>`
+   - `split <text> [--threshold <value>] [--strip-whitespace]`
+   - `stream <text> [--threshold <value>] [--strip-whitespace] [--delay <milliseconds>]`
+   - `verify-splitter`
+   - `benchmark [--iterations <count>]`
+
+   Examples:
+   - Tokenize:
+     ```bash
+     .build/release/segmenttext tokenize "Hello world."
+     ```
+   - Split:
+     ```bash
+     .build/release/segmenttext split "This is a sentence this is another sentence" --threshold 0.2 --strip-whitespace
+     ```
+   - Stream:
+     ```bash
+     .build/release/segmenttext stream "Streaming text across multiple sentences." --threshold 0.05 --delay 150
+     ```
+   - Verify Splitter:
+     ```bash
+     .build/release/segmenttext verify-splitter
+     ```
+   - Benchmark:
+     ```bash
+     .build/release/segmenttext benchmark --iterations 500
+     ```
