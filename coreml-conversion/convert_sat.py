@@ -134,7 +134,7 @@ def convert(
             for name, tensor in tokenized.items()
         ],
         outputs=[output_spec],
-        compute_units=ct.ComputeUnit.CPU_ONLY,
+        compute_units=ct.ComputeUnit.ALL,
         compute_precision=ct.precision.FLOAT32,
         minimum_deployment_target=ct.target.iOS18,
     )
