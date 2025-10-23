@@ -8,7 +8,7 @@ import SentencePieceWrapper
 struct Main: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "SaT - Tokenization and sentence segmentation tools",
-        subcommands: [Tokenize.self, Split.self, VerifySplitter.self, Benchmark.self],
+        subcommands: [Tokenize.self, Split.self, Stream.self, VerifySplitter.self, Benchmark.self],
         defaultSubcommand: Tokenize.self
     )
 }
@@ -23,7 +23,6 @@ struct Tokenize: AsyncParsableCommand {
     var text: String
 
     func run() async throws {
-        // Get the path to the model file in Resources
         guard
             let modelURL = Bundle.module.url(
                 forResource: "sentencepiece.bpe", withExtension: "model", subdirectory: "Resources")
@@ -31,44 +30,67 @@ struct Tokenize: AsyncParsableCommand {
             throw ValidationError("Could not find sentencepiece.bpe.model in Resources")
         }
 
-        // Initialize the tokenizer
         let tokenizer = try SentencePieceTokenizer(modelPath: modelURL.path)
-
-        // Use the extension method
         let (encodedTokens, offsetMapping) = tokenizer.encodeWithOffset(text: text)
 
-        // Print the encoded tokens
         print("Encoded tokens: \(encodedTokens)")
 
-        // Get token pieces for display
         let tokenPieces = tokenizer.tokenize(text: text)
         print("Token pieces: \(tokenPieces)")
-
-        // Print offset mapping
         print("Offset mapping: \(offsetMapping)")
 
-        /*
         // Print detailed mapping for clarity
         print("\nDetailed token mapping:")
         for (i, (piece, (start, end))) in zip(tokenPieces, offsetMapping).enumerated() {
-            let substring = String(text[text.index(text.startIndex, offsetBy: start)..<text.index(text.startIndex, offsetBy: end)])
+            let substring = String(
+                text[
+                    text.index(text.startIndex, offsetBy: start)
+                        ..< text.index(text.startIndex, offsetBy: end)])
             print("  Token \(i): '\(piece)' -> '\(substring)' [position \(start):\(end)]")
         }
-        */
 
-        let clsToken = tokenizer.convertTokenToId("<s>")
-        let sepToken = tokenizer.convertTokenToId("</s>")
-        let padToken = tokenizer.convertTokenToId("<pad>")
-        print("CLS token ID: \(String(describing: clsToken))")
-        print("SEP token ID: \(String(describing: sepToken))")
-        print("PAD token ID: \(String(describing: padToken))")
-
-        let a = tokenizer.convertIdToToken(2)
-        print("token 2: \(String(describing: a))")
+        //let clsToken = tokenizer.convertTokenToId("<s>")
+        //let sepToken = tokenizer.convertTokenToId("</s>")
+        //let padToken = tokenizer.convertTokenToId("<pad>")
+        //print("CLS token ID: \(String(describing: clsToken))")
+        //print("SEP token ID: \(String(describing: sepToken))")
+        //print("PAD token ID: \(String(describing: padToken))")
     }
 }
 
 struct Split: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Split text into sentences using the CoreML model",
+        discussion:
+            "This command uses the CoreML model to identify sentence boundaries and split text."
+    )
+
+    @Argument(help: "The text to split into sentences")
+    var text: String
+
+    @Option(name: .long, help: "Probability threshold for sentence boundaries (default: 0.2)")
+    var threshold: Float?
+
+    @Flag(name: .long, help: "Strip whitespace from sentences")
+    var stripWhitespace: Bool = false
+
+    func run() async throws {
+        if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *) {
+            let splitter = try SentenceSplitter(bundle: Bundle.module)
+
+            let sentences = splitter.split(
+                text: text,
+                threshold: threshold,
+                stripWhitespace: stripWhitespace)
+
+            for (i, sentence) in sentences.enumerated() {
+                print("    [\(i + 1)]: \"\(sentence)\"")
+            }
+        }
+    }
+}
+
+struct Stream: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Split text into sentences using the CoreML model",
         discussion:
@@ -159,7 +181,6 @@ struct Split: AsyncParsableCommand {
             throw ExitCode.failure
         }
     }
-
 }
 
 struct VerifySplitter: AsyncParsableCommand {
@@ -181,19 +202,16 @@ struct VerifySplitter: AsyncParsableCommand {
 
 struct Benchmark: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Benchmark original vs optimized sentence splitter",
-        discussion: "Compare performance between the original and optimized implementations."
+        abstract: "Benchmark the sentence splitter",
+        discussion: "Measure runtime and memory characteristics for common text lengths."
     )
 
     @Option(name: .long, help: "Number of iterations for benchmarking")
     var iterations: Int = 100
 
-    @Flag(name: .long, help: "Use optimized implementation only")
-    var optimizedOnly: Bool = false
-
     func run() async throws {
         if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *) {
-            try await runBenchmark(iterations: iterations, optimizedOnly: optimizedOnly)
+            try await runBenchmark(iterations: iterations)
         } else {
             print("Error: This command requires macOS 15.0 or later")
             throw ExitCode.failure

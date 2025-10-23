@@ -3,11 +3,8 @@
 //  Verify SentenceSplitter implementation
 //
 
-import Accelerate
-import CoreML
 import Foundation
 import SegmentTextKit
-import SentencePieceWrapper
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
 func verifySentenceSplitter() async throws {
@@ -19,9 +16,6 @@ func verifySentenceSplitter() async throws {
 
     // Test cases
     let testCases = [
-        // Same as in Python main.py
-        "Work order number is WO-47362. Nearest hospital is St. Mary's, about 3 miles east. Employee in charge is Tom Johnson. Cell coverage is good, that's a yes. Emergency actions were covered in the morning brief. AED is in truck number 4.",
-
         // Simple cases
         "This is a test sentence.",
         "Hello world! How are you doing today?",
@@ -88,35 +82,7 @@ func verifySentenceSplitter() async throws {
             print()
         }
 
-        print("-" * 50)
+        print(String(repeating: "-", count: 50))
         print()
-    }
-
-    // Special test: Compare probabilities for debugging
-    print("=== Probability Analysis ===")
-    let debugText =
-        "Work order number is WO-47362. Nearest hospital is St. Mary's, about 3 miles east."
-
-    // Get the raw probabilities (we'll need to add this method to SentenceSplitter)
-    // For now, just run the split with various thresholds to see what gets detected
-    print("Text: \"\(debugText)\"")
-    print()
-
-    let testThresholds: [Float] = [0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9]
-    for threshold in testThresholds {
-        let sentences = splitter.split(text: debugText, threshold: threshold, stripWhitespace: true)
-        print("Threshold \(threshold): \(sentences.count) sentences")
-        if sentences.count > 1 {
-            for (i, sentence) in sentences.enumerated() {
-                print("  [\(i + 1)]: \"\(sentence)\"")
-            }
-        }
-    }
-}
-
-// Extension to multiply string for separator lines
-extension String {
-    static func * (left: String, right: Int) -> String {
-        return String(repeating: left, count: right)
     }
 }

@@ -3,13 +3,16 @@
 //  Performance benchmarking for sentence splitter
 //
 
-import Accelerate
-import CoreML
 import Foundation
 import SegmentTextKit
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-func runBenchmark(iterations: Int, optimizedOnly: Bool = true) async throws {
+func runBenchmark(iterations: Int) async throws {
+    guard iterations > 0 else {
+        print("Iterations must be greater than zero.")
+        return
+    }
+
     print("=== SentenceSplitter Performance Benchmark ===")
     print("Iterations: \(iterations)")
     print()
@@ -39,13 +42,14 @@ func runBenchmark(iterations: Int, optimizedOnly: Bool = true) async throws {
         print(separator("-", count: 50))
 
         // Benchmark implementation
-
         let start = CFAbsoluteTimeGetCurrent()
-        var results: [[String]] = []
+        var firstResult: [String]?
 
         for _ in 0 ..< iterations {
             let result = splitter.split(text: text)
-            results.append(result)
+            if firstResult == nil {
+                firstResult = result
+            }
         }
 
         let end = CFAbsoluteTimeGetCurrent()
@@ -55,7 +59,11 @@ func runBenchmark(iterations: Int, optimizedOnly: Bool = true) async throws {
         print("Performance:")
         print("  Total time: \(String(format: "%.2f", totalTime)) ms")
         print("  Average per iteration: \(String(format: "%.3f", avgTime)) ms")
-        print("  Sentences found: \(results[0].count)")
+        if let sentences = firstResult {
+            print("  Sentences found: \(sentences.count)")
+        } else {
+            print("  Sentences found: unavailable")
+        }
     }
 
     // Memory usage test
