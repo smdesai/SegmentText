@@ -3,12 +3,13 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import typer
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_ROOT = BASE_DIR / "compiled"
 
-SOURCE_DIRS = [BASE_DIR / "sat_coreml"]
+app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
 
 
 def ensure_coremlcompiler() -> None:
@@ -29,21 +30,22 @@ def ensure_coremlcompiler() -> None:
         sys.exit(1)
 
 
-def gather_packages() -> list[Path]:
+def gather_packages(dir: str) -> list[Path]:
     """Return a list of all ``*.mlpackage`` bundles under the source dirs."""
     packages: list[Path] = []
-    for source in SOURCE_DIRS:
-        if not source.exists():
-            print(f"Warning: {source.relative_to(BASE_DIR)} does not exist; skipping", file=sys.stderr)
-            continue
-        packages.extend(source.rglob("*.mlpackage"))
+    source = BASE_DIR / dir
+    if not source.exists():
+        print(f"Warning: {source.relative_to(BASE_DIR)} does not exist; skipping", file=sys.stderr)
+        return packages
+    packages.extend(source.rglob("*.mlpackage"))
     return packages
 
 
 def compile_package(package: Path) -> None:
     """Compile a single ``.mlpackage`` bundle using ``xcrun coremlcompiler``."""
     relative_pkg = package.relative_to(BASE_DIR)
-    output_dir = OUTPUT_ROOT / relative_pkg.parent
+    #output_dir = OUTPUT_ROOT / relative_pkg.parent
+    output_dir = OUTPUT_ROOT 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{package.stem}.mlmodelc"
 
@@ -62,9 +64,15 @@ def compile_package(package: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
-def main() -> None:
+@app.command()
+def compile(
+    output_dir: Path = typer.Option(
+        Path("compiled"),
+        help="Directory where the compiled model is written",
+    ),
+):
     ensure_coremlcompiler()
-    packages = gather_packages()
+    packages = gather_packages(output_dir)
 
     if not packages:
         print("No .mlpackage bundles found to compile.")
@@ -81,4 +89,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    app()

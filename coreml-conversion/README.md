@@ -1,9 +1,14 @@
+# Segment Any Text CoreML
+Segment Any Text is state-of-the-art sentence segmentation with 3 Transfomer layers. A pytorch version of the model is used in [wtsplit](https://github.com/segment-any-text/wtpsplit) and additional details can be found in this [paper](https://arxiv.org/abs/2406.16678).
+
+If you wish to skip the CoreML conversion, you can download a precompiled `SaT.mlmodelc` from [Hugging Face](https://huggingface.co/smdesai/SaT).
+
 # CoreML Conversion
 
 ## Environment Setup
 
 1. Install [uv](https://github.com/astral-sh/uv) if it is not already available.
-2. Sync the project environment (creates `.venv/` from `uv.lock` and `pyproject.toml`):
+2. Sync the project environment.
    ```bash
    uv sync
    ```
@@ -14,26 +19,57 @@
 
 ## Converting the Model
 
-Run the conversion script to export the SaT Core ML package:
+Run the conversion script to create the SaT Core ML package:
 
 ```bash
-python convert.py
+python convert-sat.py --model-id segment-any-text/sat-3l-sm  --output-dir sat_coreml
 ```
 
-This produces `SaT.mlpackage` in the repository root.
+This produces `SaT.mlpackage` in the `sat_coreml` directory.
 
-## Compiling for Xcode
-
-Compile the package and place the artifacts in `../Sources/SegmentTextKit/Resources`:
-
+Here is the complete usage:
 ```bash
-./compile.sh
+Usage: convert_sat.py [OPTIONS]
+
+ Options
+  --model-id                 TEXT  Model identifier to download
+                                   from HuggingFace model hub
+                                   [default:
+                                   segment-any-text/sat-3l-sm]
+  --output-dir               PATH  Directory to write mlpackage and
+                                   [default: sat_coreml]
+  --conversion-type  -c      TEXT  Conversion methods to apply to
+                                   the model. Repeat the option to
+                                   chain conversions (allowed:
+                                   none, prune, quantize,
+                                   palettize; default: none).
+                                   [default: None]
 ```
 
-`compile.sh` performs the following steps:
+## Compiling the Model
 
-- Compiles `SaT.mlpackage` into `SaT.mlmodelc` using `coremlcompiler`.
-- Copies `SaT.mlmodelc` into `../Sources/SegmentTextKit/Resources`.
-- Downloads `sentencepiece.bpe.model` from the XLM-RoBERTa checkpoint (if not already present) into the same resources directory.
+Run the following to compile the model.
+```bashr
+python compile_mlmodelc.py --output-dir ../Sources/SegmentTextKit/Resources
+```
 
-Ensure `xcrun` is available (part of Xcode command-line tools) before running the script.
+This produces `SaT.mlmodelc` in the `../Sources/SegmentTextKit/Resources` directory.
+
+Here is the complete usage:
+```bash
+ Usage: compile_mlmodelc.py [OPTIONS]
+
+ Options
+  --output-dir        PATH  Directory where the compiled model is written
+                            [default: compiled]
+```
+
+## Downloading Resource
+
+Run the following to download the sentencepiece tokenizer model.
+```bash
+python download_resource.py
+```
+
+This downloads `sentencepiece.bpe.model` from the XLM-RoBERTa checkpoint (if not already present) into the same resources directory of the compiled model.
+
