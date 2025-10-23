@@ -17,14 +17,10 @@ public class SentenceSplitter {
     private let sepTokenId: Int32 = 2
     private let padTokenId: Int32 = 1
 
-    // Default parameters
+    // Default parameters (aligned with WtP / SaT defaults)
     private let maxLength = 512
-    private let stride = 256
-    private let defaultThreshold: Float = 0.25
-
-    // Cached arrays to avoid repeated allocations
-    private let inputIdsArray: MLMultiArray
-    private let attentionMaskArray: MLMultiArray
+    private let stride = 64
+    private let defaultThreshold: Float = 0.01
 
     // Cache for tokenization results
     private var tokenCache = [String: (tokens: [Int], offsets: [(Int, Int)])]()
@@ -42,7 +38,7 @@ public class SentenceSplitter {
 
         let config = MLModelConfiguration()
         config.computeUnits = .cpuAndGPU
-        config.allowLowPrecisionAccumulationOnGPU = true
+        config.allowLowPrecisionAccumulationOnGPU = false
         self.model = try MLModel(contentsOf: modelURL, configuration: config)
 
         // Load tokenizer
@@ -54,11 +50,6 @@ public class SentenceSplitter {
             )!
         self.tokenizer = try SentencePieceTokenizer(modelPath: tokenizerURL.path)
 
-        // Pre-allocate arrays
-        self.inputIdsArray = try MLMultiArray(
-            shape: [1, NSNumber(value: maxLength)], dataType: .int32)
-        self.attentionMaskArray = try MLMultiArray(
-            shape: [1, NSNumber(value: maxLength)], dataType: .int32)
     }
 
     /// Initialize with just bundle
@@ -151,32 +142,19 @@ public class SentenceSplitter {
 
         let sequenceLength = usedTokenCount + 2  // +2 for CLS and SEP tokens
 
-        // Use cached MLMultiArrays - use memcpy for better performance
-        inputIds.withUnsafeBufferPointer { idsBuffer in
-            attentionMask.withUnsafeBufferPointer { maskBuffer in
-                // Get raw pointers for direct memory access
-                let inputPtr = inputIdsArray.dataPointer.bindMemory(
-                    to: Int32.self, capacity: maxLength)
-                let maskPtr = attentionMaskArray.dataPointer.bindMemory(
-                    to: Int32.self, capacity: maxLength)
+        let idsShaped = MLShapedArray(scalars: inputIds, shape: [1, maxLength])
+        let maskShaped = MLShapedArray(scalars: attentionMask, shape: [1, maxLength])
 
-                // Copy data directly
-                memcpy(inputPtr, idsBuffer.baseAddress, maxLength * MemoryLayout<Int32>.size)
-                memcpy(maskPtr, maskBuffer.baseAddress, maxLength * MemoryLayout<Int32>.size)
-            }
-        }
-
-        // Run model prediction
         let inputFeatures = try MLDictionaryFeatureProvider(dictionary: [
-            "input_ids": MLFeatureValue(multiArray: inputIdsArray),
-            "attention_mask": MLFeatureValue(multiArray: attentionMaskArray),
+            "input_ids": MLFeatureValue(multiArray: MLMultiArray(idsShaped)),
+            "attention_mask": MLFeatureValue(multiArray: MLMultiArray(maskShaped)),
         ])
 
         let outputFeatures = try model.prediction(from: inputFeatures, options: predictionOptions)
 
-        guard let logits = outputFeatures.featureValue(for: "output")?.multiArrayValue else {
+        guard let logits = outputFeatures.featureValue(for: "logits")?.multiArrayValue else {
             throw SegmentTextError.initializationFailed(
-                "SaT model output missing 'output' feature.")
+                "SaT model output missing 'logits' feature.")
         }
 
         // Use pre-allocated buffer for probabilities

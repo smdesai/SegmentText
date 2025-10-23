@@ -92,7 +92,7 @@ struct Split: AsyncParsableCommand {
 
 struct Stream: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Split text into sentences using the CoreML model",
+        abstract: "Split streamed text into sentences using the CoreML model",
         discussion:
             "This command uses the CoreML model to identify sentence boundaries and split text."
     )
@@ -119,7 +119,6 @@ struct Stream: AsyncParsableCommand {
                 delay: delay
             )
 
-            /*
             var currentIndex = text.startIndex
             while currentIndex < text.endIndex {
                 let chunkSize = Int.random(in: 5 ... 20)
@@ -130,39 +129,6 @@ struct Stream: AsyncParsableCommand {
                 print("chunk: \(chunk)")
                 let s = runner.stream(text: chunk)
                 currentIndex = endIndex
-                if !s.isEmpty {
-                    print("sentences: \(s)")
-                }
-            
-                if delay > 0 {
-                    try? await Task.sleep(nanoseconds: delay * 1_000_000)
-                }
-            }
-            
-            let s = runner.finishStream()
-            if !s.isEmpty {
-                print("sentences: \(s)")
-            }
-            */
-
-            let chunks = [
-                "I went to see my ",
-                "univer",
-                "sity to ",
-                "see Prof. Jame",
-                "s and found he ",
-                "was not the",
-                "re and ins",
-                "tead had g",
-                "one to the hos",
-                "pital ",
-                "to see Dr. ",
-                "James about an ",
-                "ear infection.",
-            ]
-            for chunk in chunks {
-                print("chunk: \(chunk)")
-                let s = runner.stream(text: chunk)
                 if !s.isEmpty {
                     print("sentences: \(s)")
                 }

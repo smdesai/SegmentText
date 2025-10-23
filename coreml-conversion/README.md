@@ -60,6 +60,8 @@ Here is the complete usage:
  Usage: compile_mlmodelc.py [OPTIONS]
 
  Options
+  --coreml-dir        PATH  Directory where the mlpackage is
+                            [default: sat_coreml]
   --output-dir        PATH  Directory where the compiled model is written
                             [default: compiled]
 ```
