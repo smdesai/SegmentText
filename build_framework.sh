@@ -80,7 +80,7 @@ let package = Package(
             ],
             path: "Sources/SegmentTextKit",
             resources: [
-                .copy("Resources")
+                .process("Resources")
             ]
         )
     ]
