@@ -5,7 +5,7 @@
 import Accelerate
 import Foundation
 
-@available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+@available(macOS 15.0, iOS 17.0, tvOS 17.0, watchOS 11.0, visionOS 2.0, *)
 final public class StreamingSentenceSplitter {
     private let splitter: SentenceSplitter
     private let threshold: Float

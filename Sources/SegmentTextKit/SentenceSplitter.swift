@@ -6,7 +6,7 @@ import Accelerate
 import CoreML
 import Foundation
 
-@available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+@available(macOS 15.0, iOS 17.0, tvOS 17.0, watchOS 11.0, visionOS 2.0, *)
 public class SentenceSplitter {
     private let model: MLModel
     private let tokenizer: SentencePieceTokenizer
@@ -51,10 +51,13 @@ public class SentenceSplitter {
         self.model = try MLModel(contentsOf: modelURL, configuration: config)
 
         // Load tokenizer
-        guard let tokenizerURL = tokenizerPath ?? bundle.url(
-            forResource: "sentencepiece.bpe",
-            withExtension: "model"
-        ) else {
+        guard
+            let tokenizerURL = tokenizerPath
+                ?? bundle.url(
+                    forResource: "sentencepiece.bpe",
+                    withExtension: "model"
+                )
+        else {
             throw SegmentTextError.modelNotFound("sentencepiece.bpe.model")
         }
 
