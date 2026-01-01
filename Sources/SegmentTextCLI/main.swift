@@ -8,7 +8,7 @@ import SentencePieceWrapper
 struct Main: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "SaT - Tokenization and sentence segmentation tools",
-        subcommands: [Tokenize.self, Split.self, Stream.self, VerifySplitter.self, Benchmark.self],
+        subcommands: [Tokenize.self, Split.self, Stream.self, VerifySplitter.self, Benchmark.self, Download.self],
         defaultSubcommand: Tokenize.self
     )
 }
@@ -186,6 +186,92 @@ struct Benchmark: AsyncParsableCommand {
             print("Error: This command requires macOS 15.0 or later")
             throw ExitCode.failure
         }
+    }
+}
+
+struct Download: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Download the SaT model from HuggingFace",
+        discussion: "Downloads the CoreML model from HuggingFace Hub and caches it locally."
+    )
+
+    @Flag(name: .long, help: "Clear cached model before downloading")
+    var clearCache: Bool = false
+
+    @Flag(name: .long, help: "Test sentence splitting after download")
+    var test: Bool = false
+
+    func run() async throws {
+        guard #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *) else {
+            print("Error: This command requires macOS 15.0 or later")
+            throw ExitCode.failure
+        }
+
+        print("=== SaT Model Downloader ===")
+        print("Repository: smdesai/SaT")
+        print("Cache: \(ModelDownloader.cacheDirectory.path)")
+        print()
+
+        if clearCache {
+            print("Clearing cache...")
+            try ModelDownloader.shared.clearCache()
+            print("Cache cleared.")
+            print()
+        }
+
+        // Check current state
+        if let cached = ModelDownloader.shared.cachedModelURL() {
+            print("Model already cached at: \(cached.path)")
+            if !clearCache {
+                print("Use --clear-cache to force re-download")
+            }
+        } else {
+            print("Model not cached, downloading...")
+        }
+
+        print()
+        print("Starting download...")
+
+        var lastPercent = -1
+        for await progress in await ModelDownloader.shared.download() {
+            switch progress {
+            case .notStarted:
+                break
+            case .checking:
+                print("  Checking cache...")
+            case .downloading(let fraction, let speed):
+                let percent = Int(fraction * 100)
+                if percent != lastPercent && percent % 5 == 0 {
+                    let speedStr = speed.map { String(format: "%.1f KB/s", $0 / 1024) } ?? ""
+                    print("  Downloading: \(percent)% \(speedStr)")
+                    lastPercent = percent
+                }
+            case .completed(let url):
+                print()
+                print("✓ Download complete!")
+                print("  Model path: \(url.path)")
+            case .failed(let error):
+                print()
+                print("✗ Download failed: \(error.localizedDescription)")
+                throw ExitCode.failure
+            }
+        }
+
+        if test {
+            print()
+            print("Testing sentence splitting...")
+            let splitter = try await SentenceSplitter()
+            let testText = "Hello world. This is a test. The download worked!"
+            let sentences = splitter.split(text: testText)
+            print("  Input: \"\(testText)\"")
+            print("  Sentences found: \(sentences.count)")
+            for (i, s) in sentences.enumerated() {
+                print("    [\(i + 1)]: \"\(s)\"")
+            }
+        }
+
+        print()
+        print("Done!")
     }
 }
 

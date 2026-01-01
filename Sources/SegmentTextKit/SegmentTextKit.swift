@@ -46,6 +46,29 @@ public class SegmentTextKit {
         }
     }
 
+    /// Initialize with automatic model download if not available locally.
+    ///
+    /// This async initializer will download the CoreML model from HuggingFace
+    /// if it's not bundled or cached. The tokenizer is always loaded from the bundle.
+    ///
+    /// - Parameter progressHandler: Optional closure called with download progress updates.
+    ///   Only called if a download is required.
+    /// - Throws: `ModelDownloadError` if download fails, `SegmentTextError` if model loading fails.
+    public init(progressHandler: (@Sendable (DownloadProgress) -> Void)? = nil) async throws {
+        let bundle = Bundle.module
+
+        // Tokenizer is always from bundle
+        guard
+            let tokenizerURL = bundle.url(
+                forResource: "sentencepiece.bpe", withExtension: "model", subdirectory: "Resources")
+        else {
+            throw SegmentTextError.modelNotFound("sentencepiece.bpe.model")
+        }
+
+        self.tokenizer = try SentencePieceTokenizer(modelPath: tokenizerURL.path)
+        self.sentenceSplitter = try await SentenceSplitter(progressHandler: progressHandler)
+    }
+
     // MARK: - Sentence Splitting
 
     /// Split text into sentences

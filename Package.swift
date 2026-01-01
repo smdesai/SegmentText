@@ -40,6 +40,7 @@ let package = Package(
             name: "SegmentTextKit",
             dependencies: [
                 .product(name: "Transformers", package: "swift-transformers"),
+                .product(name: "Hub", package: "swift-transformers"),
                 "SentencePieceWrapper",
             ],
             resources: [

@@ -86,6 +86,76 @@ public class SentenceSplitter {
         try self.init(modelPath: modelPath, tokenizerPath: nil, bundle: Bundle.module)
     }
 
+    /// Initialize with automatic model download if not available locally.
+    ///
+    /// This async initializer will:
+    /// 1. Check if the model is bundled with the app
+    /// 2. Check if the model is cached from a previous download
+    /// 3. Download from HuggingFace if not available
+    ///
+    /// - Parameter progressHandler: Optional closure called with download progress updates.
+    ///   Only called if a download is required.
+    /// - Throws: `ModelDownloadError` if download fails, `SegmentTextError` if model loading fails.
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    public convenience init(
+        progressHandler: (@Sendable (DownloadProgress) -> Void)? = nil
+    ) async throws {
+        // Try bundled model first (fastest path)
+        if let bundledModel = Bundle.module.url(forResource: "SaT", withExtension: "mlmodelc") {
+            try self.init(modelPath: bundledModel)
+            return
+        }
+
+        // Check cache
+        if let cached = ModelDownloader.shared.cachedModelURL() {
+            try self.init(modelPath: cached)
+            return
+        }
+
+        // Download required
+        var modelURL: URL?
+        for await progress in await ModelDownloader.shared.download() {
+            progressHandler?(progress)
+            switch progress {
+            case .completed(let url):
+                modelURL = url
+            case .failed(let error):
+                throw error
+            default:
+                continue
+            }
+            if modelURL != nil { break }
+        }
+
+        guard let url = modelURL else {
+            throw SegmentTextError.modelNotFound("Download completed without returning model URL")
+        }
+
+        try self.init(modelPath: url)
+    }
+
+    /// Pre-download the model without initializing the splitter.
+    ///
+    /// Use this to download the model during app launch or in the background
+    /// before you need to use the splitter.
+    ///
+    /// - Returns: An async stream of download progress updates.
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    public static func downloadModel() async -> AsyncStream<DownloadProgress> {
+        await ModelDownloader.shared.download()
+    }
+
+    /// Check if the model is available locally (bundled or cached).
+    ///
+    /// Use this to determine if initialization will require a download.
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    public static var isModelAvailable: Bool {
+        if Bundle.module.url(forResource: "SaT", withExtension: "mlmodelc") != nil {
+            return true
+        }
+        return ModelDownloader.shared.cachedModelURL() != nil
+    }
+
     public func split(
         text: String,
         threshold: Float? = nil,

@@ -113,28 +113,6 @@ A Swift framework for sentence segmentation and tokenization using CoreML and Se
 1. Copy this entire directory to your project
 2. Add the package as a local Swift Package
 
-## Usage
-
-```swift
-import SegmentTextKit
-
-// Initialize
-let segmenter = try SegmentTextKit()
-
-// Split sentences
-let sentences = segmenter.splitSentences("Hello world. How are you? I'm fine, thanks!")
-// Output: ["Hello world.", "How are you?", "I'm fine, thanks!"]
-
-// Tokenize text
-let tokens = segmenter.encode("Hello world")
-// Output: [35378, 8999]
-
-// Tokenize with offsets
-let (tokens, offsets) = segmenter.encodeWithOffsets("Hello world")
-// tokens: [35378, 8999]
-// offsets: [(0, 5), (6, 11)]
-```
-
 ## Requirements
 
 - iOS 17.0+ / macOS 14.0+
@@ -144,52 +122,8 @@ let (tokens, offsets) = segmenter.encodeWithOffsets("Hello world")
 
 - **SegmentTextKit**: Main framework with public API
 - **SentencePiece.xcframework**: Tokenization library
-- **CoreML Model**: Sentence segmentation model
-- **Resources**: Pre-trained models (sentencepiece.bpe.model, SaT.mlmodelc)
-EOF
-
-# Create a simple example
-mkdir -p "$OUTPUT_DIR/Examples"
-cat >"$OUTPUT_DIR/Examples/Example.swift" <<'EOF'
-import SegmentTextKit
-
-// Example usage
-@available(macOS 15.0, iOS 18.0, *)
-func demonstrateSegmentTextKit() async throws {
-    // Initialize the framework
-    let segmenter = try SegmentTextKit()
-
-    // Example text
-    let text = """
-    Hello world. How are you doing today? I hope you're having a great day!
-    This is another paragraph. It contains multiple sentences.
-    """
-
-    // Split into sentences
-    let sentences = segmenter.splitSentences(text)
-    print("Sentences:")
-    for (i, sentence) in sentences.enumerated() {
-        print("  \(i + 1): \(sentence)")
-    }
-
-    // Tokenize a sentence
-    let firstSentence = sentences.first ?? ""
-    let tokens = segmenter.encode(firstSentence)
-    print("\nTokens for '\(firstSentence)':")
-    print("  IDs: \(tokens)")
-
-    // Get token pieces
-    let pieces = segmenter.tokenize(firstSentence)
-    print("  Pieces: \(pieces)")
-
-    // Tokenize with offsets
-    let (tokenIds, offsets) = segmenter.encodeWithOffsets(firstSentence)
-    print("\nToken offsets:")
-    for (token, (start, end)) in zip(pieces, offsets) {
-        let substring = String(firstSentence[firstSentence.index(firstSentence.startIndex, offsetBy: start)..<firstSentence.index(firstSentence.startIndex, offsetBy: end)])
-        print("  '\(token)' -> '\(substring)' [\(start):\(end)]")
-    }
-}
+- **Resources**: Tokenizer (sentencepiece.bpe.model)
+- **Model**: Downloaded from Huggingface
 EOF
 
 # Create archive
