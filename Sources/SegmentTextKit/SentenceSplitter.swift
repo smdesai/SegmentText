@@ -189,7 +189,7 @@ public class SentenceSplitter {
 
         let outputFeatures = try model.prediction(from: inputFeatures, options: predictionOptions)
 
-        guard let logits = outputFeatures.featureValue(for: "output")?.multiArrayValue else {
+        guard let logits = outputFeatures.featureValue(for: "logits")?.multiArrayValue else {
             throw SegmentTextError.initializationFailed(
                 "SaT model output missing 'output' feature.")
         }

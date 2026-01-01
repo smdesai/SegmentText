@@ -1,3 +1,19 @@
+"""Convert Segment Any Text (SAT) model to CoreML format.
+
+This script converts SAT models to CoreML format with optional optimizations:
+- FP32 (default): Full precision, largest model
+- INT8 quantization: ~75% size reduction with no accuracy loss (recommended)
+- Palettization: Alternative compression method
+- Pruning: Remove near-zero weights
+
+Usage:
+    python convert_sat.py                          # FP32 model (default)
+    python convert_sat.py -c quantize              # FP32 + INT8 quantization (recommended)
+    python convert_sat.py -c palettize             # FP32 + 8-bit palettization
+    python convert_sat.py -c prune -c quantize     # Pruned + quantized
+
+Output: sat_coreml/SaT[_int8|_pal|_pruned].mlpackage
+"""
 from __future__ import annotations
 
 import os
@@ -14,7 +30,6 @@ import wtpsplit.models  # registers SubwordXLM config/model types
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 DEFAULT_MODEL_ID = "segment-any-text/sat-3l-sm"
-
 
 from conversion_utils import (
     Conversion,
@@ -69,15 +84,20 @@ def convert(
         "--conversion-type",
         "-c",
         help=(
-            "Conversion methods to apply to the model. "
+            "Optimization methods to apply. "
             "Repeat the option to chain conversions "
             "(allowed: none, prune, quantize, palettize; default: none)."
         ),
     ),
 ):
-
     conversions_to_apply = parse_conversion_types(conversion_types)
 
+    print(f"\n{'='*60}")
+    print(f"Converting SAT model: {model_id}")
+    print(f"Optimizations: {[c.name for c in conversions_to_apply]}")
+    print(f"{'='*60}\n")
+
+    print("Loading model from HuggingFace...")
     model = AutoModelForTokenClassification.from_pretrained(
         model_id,
         return_dict=False,
@@ -114,6 +134,8 @@ def convert(
         tokenized["input_ids"].to(torch.int32),
         tokenized["attention_mask"].to(torch.int32),
     )
+
+    print("Tracing model...")
     traced_model = torch.jit.trace(wrapped_model, example_inputs, strict=False)
     traced_model.eval()
 
@@ -122,6 +144,7 @@ def convert(
 
     output_spec = ct.TensorType(name="logits", dtype=np.float32)
 
+    print("Converting to CoreML...")
     mlpackage = ct.convert(
         traced_model,
         convert_to="mlprogram",
@@ -147,12 +170,40 @@ def convert(
         print(e)
         return
 
+    # Build output name with optimization suffix
     saved_name = "SaT"
+    for conv in conversions_to_apply:
+        if conv == Conversion.QUANTIZE:
+            saved_name += "_int8"
+        elif conv == Conversion.PALETTIZE:
+            saved_name += "_pal"
+        elif conv == Conversion.PRUNE:
+            saved_name += "_pruned"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
     saved_path = output_dir / f"{saved_name}.mlpackage"
     new_model.save(saved_path)
 
     manifest_file = saved_path / "Manifest.json"
     update_manifest_model_name(manifest_file, saved_name)
+
+    # Summary
+    print(f"\n{'='*60}")
+    print("Conversion complete!")
+    print(f"{'='*60}")
+    print(f"Saved: {saved_path}")
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["du", "-sh", str(saved_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        size_str = result.stdout.split()[0] if result.stdout else "?"
+        print(f"Size: {size_str}")
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     app()

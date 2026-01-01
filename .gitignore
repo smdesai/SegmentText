@@ -53,3 +53,6 @@ fastlane/test_output
 *.tmp
 *.temp
 *~
+
+# Continuous Claude cache (local only)
+.claude/cache/

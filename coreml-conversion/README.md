@@ -22,7 +22,7 @@ If you wish to skip the CoreML conversion, you can download a precompiled `SaT.m
 Run the conversion script to create the SaT Core ML package:
 
 ```bash
-python convert-sat.py --model-id segment-any-text/sat-3l-sm  --output-dir sat_coreml
+python convert_sat.py --model-id segment-any-text/sat-3l-sm  --output-dir sat_coreml
 ```
 
 This produces `SaT.mlpackage` in the `sat_coreml` directory.
