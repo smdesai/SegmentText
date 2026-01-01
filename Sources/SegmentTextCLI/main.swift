@@ -175,9 +175,13 @@ struct Benchmark: AsyncParsableCommand {
     @Option(name: .long, help: "Number of iterations for benchmarking")
     var iterations: Int = 100
 
+    @Option(name: .long, help: "Path to CoreML model (.mlmodelc directory)")
+    var modelPath: String?
+
     func run() async throws {
         if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *) {
-            try await runBenchmark(iterations: iterations)
+            let modelURL = modelPath.map { URL(fileURLWithPath: $0) }
+            try await runBenchmark(iterations: iterations, modelPath: modelURL)
         } else {
             print("Error: This command requires macOS 15.0 or later")
             throw ExitCode.failure

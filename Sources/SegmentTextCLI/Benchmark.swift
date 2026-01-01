@@ -7,13 +7,22 @@ import Foundation
 import SegmentTextKit
 
 @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
-func runBenchmark(iterations: Int) async throws {
+func runBenchmark(iterations: Int, modelPath: URL? = nil) async throws {
     guard iterations > 0 else {
         print("Iterations must be greater than zero.")
         return
     }
 
+    // Determine model name for display
+    let modelName: String
+    if let path = modelPath {
+        modelName = path.deletingPathExtension().lastPathComponent
+    } else {
+        modelName = "SaT (bundled)"
+    }
+
     print("=== SentenceSplitter Performance Benchmark ===")
+    print("Model: \(modelName)")
     print("Iterations: \(iterations)")
     print()
 
@@ -23,15 +32,20 @@ func runBenchmark(iterations: Int) async throws {
         "This is a short test. It has multiple sentences. Each one ends with punctuation!",
 
         // Medium text (~500 chars)
-        "The sun rose slowly, painting the sky in soft gold and blush pink; birds chirped—brief, bright symphonies—as if greeting the day with quiet joy, while a lone cyclist pedaled down the empty street, wheels humming against pavement. Somewhere, a cat stretched in a sunbeam, unaware of the world’s rush; children laughed in the distance, their voices tumbling like wind chimes. The coffee shop opened its doors, releasing the rich aroma of roasted beans",
+        "The sun rose slowly, painting the sky in soft gold and blush pink; birds chirped—brief, bright symphonies—as if greeting the day with quiet joy, while a lone cyclist pedaled down the empty street, wheels humming against pavement. Somewhere, a cat stretched in a sunbeam, unaware of the world's rush; children laughed in the distance, their voices tumbling like wind chimes. The coffee shop opened its doors, releasing the rich aroma of roasted beans",
 
         // Long text (> 512 chars, requires sliding window)
         String(repeating: "This is a test sentence that will be repeated many times. ", count: 20)
             + "Final sentence at the end of this very long text. It should trigger the sliding window processing.",
     ]
 
-    // Initialize splitter
-    let splitter = try SentenceSplitter(bundle: Bundle.module)
+    // Initialize splitter with optional external model path
+    let splitter: SentenceSplitter
+    if let path = modelPath {
+        splitter = try SentenceSplitter(modelPath: path)
+    } else {
+        splitter = try SentenceSplitter(bundle: Bundle.module)
+    }
 
     // Warm up (first run is slower due to model loading)
     print("Warming up model...")
