@@ -8,7 +8,10 @@ import SentencePieceWrapper
 struct Main: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "SaT - Tokenization and sentence segmentation tools",
-        subcommands: [Tokenize.self, Split.self, Stream.self, VerifySplitter.self, Benchmark.self, Download.self],
+        subcommands: [
+            Tokenize.self, Split.self, Stream.self, VerifySplitter.self, Benchmark.self,
+            Download.self,
+        ],
         defaultSubcommand: Tokenize.self
     )
 }

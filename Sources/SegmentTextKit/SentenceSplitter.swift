@@ -41,7 +41,7 @@ public class SentenceSplitter {
             modelURL = bundlePath
         } else {
             throw SegmentTextError.modelNotFound(
-                "SaT.mlmodelc not found in bundle. Use KokoroSegmentationManager to download from HuggingFace."
+                "SaT.mlmodelc not found in bundle. Download from HuggingFace."
             )
         }
 

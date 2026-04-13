@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import Hub
 import SentencePieceWrapper
 import Tokenizers
 
@@ -100,7 +99,8 @@ public class SentencePieceTokenizer: PreTrainedTokenizerModel {
 
     // Required initializer for PreTrainedTokenizerModel
     public required convenience init(
-        tokenizerConfig: Config, tokenizerData: Config, addedTokens: [String: Int]
+        tokenizerConfig: Config, tokenizerData: Config, addedTokens: [String: Int],
+        vocab: TokenizerVocab?, merges: TokenizerMerges?
     ) throws {
         // Extract model path from config or use default
         let modelPath = "tokenizer/sentencepiece.bpe.model"

@@ -40,14 +40,16 @@ cp -r Frameworks/SentencePiece.xcframework "$OUTPUT_DIR/"
 
 # Create Package.swift
 cat >"$OUTPUT_DIR/Package.swift" <<'EOF'
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
 import PackageDescription
 
 let package = Package(
-    name: "SegmentTextKit",
+    name: "segmenttext",
     platforms: [
         .iOS(.v17),
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     products: [
         .library(
@@ -56,7 +58,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.1.0"))
+        .package(url: "https://github.com/DePasqualeOrg/swift-tokenizers.git", from: "0.3.2"),
+        .package(url: "https://github.com/DePasqualeOrg/swift-hf-api.git", from: "0.2.2"),
     ],
     targets: [
         .binaryTarget(
@@ -66,8 +69,6 @@ let package = Package(
         .target(
             name: "SentencePieceWrapper",
             dependencies: ["SentencePiece"],
-            path: "Sources/SentencePieceWrapper",
-            publicHeadersPath: "include",
             linkerSettings: [
                 .linkedFramework("SentencePiece", .when(platforms: [.macOS]))
             ]
@@ -75,14 +76,14 @@ let package = Package(
         .target(
             name: "SegmentTextKit",
             dependencies: [
-                .product(name: "Transformers", package: "swift-transformers"),
-                "SentencePieceWrapper"
+                .product(name: "Tokenizers", package: "swift-tokenizers"),
+                .product(name: "HFAPI", package: "swift-hf-api"),
+                "SentencePieceWrapper",
             ],
-            path: "Sources/SegmentTextKit",
             resources: [
-                .process("Resources")
+                .copy("Resources")
             ]
-        )
+        ),
     ]
 )
 EOF

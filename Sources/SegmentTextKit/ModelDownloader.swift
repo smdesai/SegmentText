@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Hub
+import HFAPI
 
 /// Thread-safe progress state container for download progress reporting.
 private final class ProgressState: @unchecked Sendable {
@@ -37,7 +37,7 @@ public actor ModelDownloader {
     public static let shared = ModelDownloader()
 
     /// Default HuggingFace repository for the SaT model.
-    public static let defaultRepoId = "smdesai/SaT"
+    public static let defaultRepoId: Repo.ID = "smdesai/SaT"
 
     /// Glob pattern to match the compiled CoreML model directory.
     public static let defaultGlob = "SaT.mlmodelc/**"
@@ -57,23 +57,35 @@ public actor ModelDownloader {
         return base.appendingPathComponent("SegmentText/models", isDirectory: true)
     }
 
+    private static var hubCache: HubCache {
+        HubCache(cacheDirectory: Self.cacheDirectory)
+    }
+
     /// Returns the local URL of the cached model if it exists.
     ///
     /// - Returns: URL to the cached `.mlmodelc` directory, or `nil` if not cached.
     public nonisolated func cachedModelURL() -> URL? {
-        let hub = HubApi(downloadBase: Self.cacheDirectory)
-        let repo = Hub.Repo(id: Self.defaultRepoId)
-        let repoLocation = hub.localRepoLocation(repo)
-        let modelPath = repoLocation.appendingPathComponent(Self.modelFilename)
+        let cache = Self.hubCache
+        let snapshotsDir = cache.snapshotsDirectory(repo: Self.defaultRepoId, kind: .model)
 
-        // Check if the model directory exists and contains expected files
-        var isDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: modelPath.path, isDirectory: &isDirectory),
-           isDirectory.boolValue {
-            // Verify it contains at least the metadata.json (basic integrity check)
-            let metadataPath = modelPath.appendingPathComponent("metadata.json")
-            if FileManager.default.fileExists(atPath: metadataPath.path) {
-                return modelPath
+        // Look for any snapshot directory that contains the model
+        guard FileManager.default.fileExists(atPath: snapshotsDir.path),
+            let snapshots = try? FileManager.default.contentsOfDirectory(
+                at: snapshotsDir, includingPropertiesForKeys: nil)
+        else {
+            return nil
+        }
+
+        for snapshot in snapshots {
+            let modelPath = snapshot.appendingPathComponent(Self.modelFilename)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: modelPath.path, isDirectory: &isDirectory),
+                isDirectory.boolValue
+            {
+                let metadataPath = modelPath.appendingPathComponent("metadata.json")
+                if FileManager.default.fileExists(atPath: metadataPath.path) {
+                    return modelPath
+                }
             }
         }
 
@@ -123,20 +135,18 @@ public actor ModelDownloader {
                         withIntermediateDirectories: true
                     )
 
-                    // Configure HubApi with our cache directory
-                    let hub = HubApi(
-                        downloadBase: Self.cacheDirectory,
-                        useBackgroundSession: false
-                    )
+                    // Configure HubClient with our cache directory
+                    let client = HubClient(cache: Self.hubCache)
 
                     // Download using snapshot with glob pattern
-                    // Use nonisolated progress handling to avoid Sendable issues
                     let progressState = ProgressState()
-                    let repoLocation = try await hub.snapshot(
-                        from: Self.defaultRepoId,
-                        matching: Self.defaultGlob
-                    ) { (progress: Progress) in
-                        progressState.update(fraction: progress.fractionCompleted, speed: progress.userInfo[.throughputKey] as? Double)
+                    let repoLocation = try await client.downloadSnapshot(
+                        of: Self.defaultRepoId,
+                        matching: [Self.defaultGlob]
+                    ) { progress in
+                        progressState.update(
+                            fraction: progress.fractionCompleted,
+                            speed: progress.userInfo[.throughputKey] as? Double)
                     }
 
                     // Broadcast final progress
@@ -157,18 +167,6 @@ public actor ModelDownloader {
                 } catch is CancellationError {
                     self.broadcast(.failed(ModelDownloadError.cancelled))
                     throw ModelDownloadError.cancelled
-                } catch let error as Hub.HubClientError {
-                    let downloadError: ModelDownloadError
-                    switch error {
-                    case .fileNotFound(let file):
-                        downloadError = .modelNotFound(file)
-                    case .authorizationRequired:
-                        downloadError = .networkError("Authorization required for private repository")
-                    default:
-                        downloadError = .networkError(error.localizedDescription)
-                    }
-                    self.broadcast(.failed(downloadError))
-                    throw downloadError
                 } catch {
                     let downloadError = ModelDownloadError.networkError(error.localizedDescription)
                     self.broadcast(.failed(downloadError))
@@ -188,12 +186,11 @@ public actor ModelDownloader {
     ///
     /// - Throws: File system errors if the cache cannot be removed.
     public nonisolated func clearCache() throws {
-        let hub = HubApi(downloadBase: Self.cacheDirectory)
-        let repo = Hub.Repo(id: Self.defaultRepoId)
-        let repoLocation = hub.localRepoLocation(repo)
+        let cache = Self.hubCache
+        let repoDir = cache.repoDirectory(repo: Self.defaultRepoId, kind: .model)
 
-        if FileManager.default.fileExists(atPath: repoLocation.path) {
-            try FileManager.default.removeItem(at: repoLocation)
+        if FileManager.default.fileExists(atPath: repoDir.path) {
+            try FileManager.default.removeItem(at: repoDir)
         }
     }
 

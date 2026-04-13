@@ -20,9 +20,9 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(
-            url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.1.0")),
+        .package(url: "https://github.com/DePasqualeOrg/swift-tokenizers.git", from: "0.3.2"),
+        .package(url: "https://github.com/DePasqualeOrg/swift-hf-api.git", from: "0.2.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
     ],
     targets: [
         .binaryTarget(
@@ -39,8 +39,8 @@ let package = Package(
         .target(
             name: "SegmentTextKit",
             dependencies: [
-                .product(name: "Transformers", package: "swift-transformers"),
-                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "Tokenizers", package: "swift-tokenizers"),
+                .product(name: "HFAPI", package: "swift-hf-api"),
                 "SentencePieceWrapper",
             ],
             resources: [
@@ -51,7 +51,8 @@ let package = Package(
             name: "segmenttext",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "Transformers", package: "swift-transformers"),
+                .product(name: "Tokenizers", package: "swift-tokenizers"),
+                .product(name: "HFAPI", package: "swift-hf-api"),
                 "SentencePieceWrapper",
                 "SegmentTextKit",
             ],
